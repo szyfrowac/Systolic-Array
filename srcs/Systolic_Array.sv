@@ -54,12 +54,11 @@ module SystolicArray #(
   wire [DATA_WIDTH-1:0] pe_d_out [0:ROWS-1][0:COLS-1];
   wire [DATA_WIDTH-1:0] pe_d_prime_out [0:ROWS-1][0:COLS-1];
 
-  genvar r, c;
   generate
-    for(r = 0; r < ROWS; r = r + 1) begin : gen_row_out
+    for(genvar r = 0; r < ROWS; r = r + 1) begin : gen_row_out
       assign io_a_out[r] = pe_a_out[r][COLS-1];
     end
-    for(c = 0; c < COLS; c = c + 1) begin : gen_col_out
+    for(genvar c = 0; c < COLS; c = c + 1) begin : gen_final_addout
       // Final adder per column to sum D and D'
       FPadder final_adder (
         .io_a     (pe_d_out[ROWS-1][c]),
@@ -71,8 +70,8 @@ module SystolicArray #(
   endgenerate
 
   generate
-    for(r = 0; r < ROWS; r = r + 1) begin : gen_pe_row
-      for(c = 0; c < COLS; c = c + 1) begin : gen_pe_col
+    for(genvar r = 0; r < ROWS; r = r + 1) begin : gen_pe_row
+      for(genvar c = 0; c < COLS; c = c + 1) begin : gen_pe_col
         wire [DATA_WIDTH-1:0] a_in;
         wire [DATA_WIDTH-1:0] d_in;
         wire [DATA_WIDTH-1:0] d_prime_in;

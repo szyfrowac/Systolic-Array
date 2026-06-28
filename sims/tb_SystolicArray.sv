@@ -24,7 +24,7 @@ module tb_SystolicArray();
   wire [DATA_WIDTH-1:0] io_c_out [0:COLS-1];
 
   // Instantiate the Unit Under Test (UUT)
-  SystolicArray #(
+  SystolicArray_post_wrapper #(
     .ROWS(ROWS),
     .COLS(COLS),
     .DATA_WIDTH(DATA_WIDTH)
@@ -43,7 +43,7 @@ module tb_SystolicArray();
   // Clock generation
   initial begin
     clock = 0;
-    forever #5 clock = ~clock; // 100MHz clock
+    forever #15 clock = ~clock; // 33.3MHz clock for post-impl timing
   end
 
   // Test stimulus

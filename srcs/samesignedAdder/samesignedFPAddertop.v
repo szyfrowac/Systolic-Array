@@ -9,11 +9,7 @@ module samesignedFPaddertop(
   input         io_op,
   input  [1:0]  io_round
 );
-  reg [31:0] _RAND_0;
-  reg [31:0] _RAND_1;
-  reg [31:0] _RAND_2;
-  reg [31:0] _RAND_3;
-`endif // RANDOMIZE_REG_INIT
+
   wire  FPadderModule_clock;
   wire  FPadderModule_reset;
   wire [31:0] FPadderModule_io_a;
