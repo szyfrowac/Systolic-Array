@@ -1,96 +1,140 @@
 `timescale 1ns / 1ps
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 11/27/2025 09:18:02 AM
+// Design Name: 
+// Module Name: mesh
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
+
 
 module SystolicArray #(
-  parameter ROWS = 4,
-  parameter COLS = 4
+  parameter ROWS = 2,
+  parameter COLS = 2,
+  parameter DATA_WIDTH = 32
 )(
-  input                     clock,
-  input                     reset,
+  input clock,
+  input reset,
   
-  // Input ports - one per column for 'a' data
-  input  [31:0]             io_a_in [0:COLS-1],
+  // Input ports - one per row for 'a' data
+  input [DATA_WIDTH-1:0] io_a_in [0:ROWS-1],
+  input [DATA_WIDTH-1:0] io_b_in [0:ROWS-1][0:COLS-1],
+  input io_load_b,
   
-  // Input ports - one per row for 'b' data
-  input  [31:0]             io_b_in [0:ROWS-1],
-  input                     io_load_b [0:ROWS-1],
-  
-  // Input ports - one per PE for 'd' and 'd_prime'
-  input  [31:0]             io_d_in [0:ROWS-1][0:COLS-1],
-  input  [31:0]             io_d_prime_in [0:ROWS-1][0:COLS-1],
+  input  [DATA_WIDTH-1:0] io_d_in [0:ROWS-2][0:COLS-2],
   
   // Control signal
-  input  [1:0]              io_round,
+  input [1:0] io_round,
   
   // Output ports - one per row for 'a' data
-  output [31:0]             io_a_out [0:ROWS-1],
+  output [DATA_WIDTH-1:0] io_a_out [0:ROWS-1],
   
   // Output ports - one per PE for 'd' and 'd_prime'
-  output [31:0]             io_d_out [0:ROWS-1][0:COLS-1],
-  output [31:0]             io_d_prime_out [0:ROWS-1][0:COLS-1]
+  output [DATA_WIDTH-1:0] io_d_out [0:ROWS-1][0:COLS-1],
+  output [DATA_WIDTH-1:0] io_d_prime_out [0:ROWS-1][0:COLS-1]
 );
+  
+  reg [DATA_WIDTH-1:0] d_pipe [0:ROWS-1][0:COLS-1];
+  reg [DATA_WIDTH-1:0] d_prime_pipe [0:ROWS-1][0:COLS-1];
+  // Allocate up to COLS-1 to avoid negative index bounds when COLS=1
+  reg [DATA_WIDTH-1:0] a_pipe [0:ROWS-1][0:(COLS>1 ? COLS-2 : 0)];
+  
+  wire [DATA_WIDTH-1:0] pe_a_out [0:ROWS-1][0:COLS-1];
+  wire [DATA_WIDTH-1:0] pe_d_out [0:ROWS-1][0:COLS-1];
+  wire [DATA_WIDTH-1:0] pe_d_prime_out [0:ROWS-1][0:COLS-1];
 
-  // Internal wires for horizontal 'a' propagation (left to right)
-  wire [31:0] a_wire [0:ROWS-1][0:COLS];
-  
-  // Internal wires for vertical 'b' propagation (top to bottom)
-  wire [31:0] b_wire [0:ROWS][0:COLS-1];
-  
-  // Generate systolic array mesh
-  genvar row, col;
+  genvar r, c;
   generate
-    for (row = 0; row < ROWS; row = row + 1) begin : gen_rows
-      for (col = 0; col < COLS; col = col + 1) begin : gen_cols
-        
-        // Instantiate processing element
+    for(r = 0; r < ROWS; r = r + 1) begin : gen_row_out
+      assign io_a_out[r] = pe_a_out[r][COLS-1];
+      for(c = 0; c < COLS; c = c + 1) begin : gen_col_out
+        assign io_d_out[r][c] = pe_d_out[r][c];
+        assign io_d_prime_out[r][c] = pe_d_prime_out[r][c];
+      end
+    end
+  endgenerate
+
+  generate
+    for(r = 0; r < ROWS; r = r + 1) begin : gen_pe_row
+      for(c = 0; c < COLS; c = c + 1) begin : gen_pe_col
+        wire [DATA_WIDTH-1:0] a_in;
+        wire [DATA_WIDTH-1:0] d_in;
+        wire [DATA_WIDTH-1:0] d_prime_in;
+
+        if (c == 0) begin
+          assign a_in = io_a_in[r];
+        end else begin
+          assign a_in = a_pipe[r][c-1];
+        end
+
+        if (r == 0) begin
+          assign d_in = io_d_in[0][c];
+          assign d_prime_in = io_d_in[0][c][DATA_WIDTH-1] ? {DATA_WIDTH{1'b0}} : {1'b1, {(DATA_WIDTH-1){1'b0}}};
+        end else begin
+          assign d_in = d_pipe[r-1][c];
+          assign d_prime_in = d_prime_pipe[r-1][c];
+        end
+
         WSPETOP pe (
           .clock(clock),
           .reset(reset),
-          
-          // Horizontal 'a' dataflow (left to right)
-          .io_a(a_wire[row][col]),
-          .io_a_out(a_wire[row][col+1]),
-          
-          // Vertical 'b' dataflow (top to bottom)
-          .io_b_in(b_wire[row][col]),
-          .io_load_b(io_load_b[row]),
-          
-          // Stationary 'd' and 'd_prime' inputs
-          .io_d(io_d_in[row][col]),
-          .io_d_prime(io_d_prime_in[row][col]),
-          
-          // Control
+          .io_a(a_in),
+          .io_b_in(io_b_in[r][c]),
+          .io_load_b(io_load_b),
+          .io_d(d_in),
+          .io_d_prime(d_prime_in),
           .io_round(io_round),
-          
-          // Outputs
-          .io_d_out(io_d_out[row][col]),
-          .io_d_prime_out(io_d_prime_out[row][col])
+          .io_a_out(pe_a_out[r][c]),
+          .io_d_out(pe_d_out[r][c]),
+          .io_d_prime_out(pe_d_prime_out[r][c])
         );
       end
     end
   endgenerate
-  
-  // Connect input 'a' values to the leftmost column
-  generate
-    for (row = 0; row < ROWS; row = row + 1) begin : connect_a_inputs
-      assign a_wire[row][0] = io_a_in[row];
+
+  always_ff @(posedge clock or negedge reset) begin
+    if(!reset) begin
+      for(int i = 0; i < ROWS; i = i + 1) begin
+        for(int j = 0; j < COLS; j = j + 1) begin
+          d_pipe[i][j] <= {DATA_WIDTH{1'b0}};
+          d_prime_pipe[i][j] <= {DATA_WIDTH{1'b0}};
+        end
+      end
+      if (COLS > 1) begin
+        for(int i = 0; i < ROWS; i = i + 1) begin
+          for(int j = 0; j < COLS-1; j = j + 1) begin
+            a_pipe[i][j] <= {DATA_WIDTH{1'b0}};
+          end
+        end
+      end
     end
-  endgenerate
-  
-  // Connect output 'a' values from the rightmost column
-  generate
-    for (row = 0; row < ROWS; row = row + 1) begin : connect_a_outputs
-      assign io_a_out[row] = a_wire[row][COLS];
+    else begin
+      for(int i = 0; i < ROWS; i = i + 1) begin
+        for(int j = 0; j < COLS; j = j + 1) begin
+          d_pipe[i][j] <= pe_d_out[i][j];
+          d_prime_pipe[i][j] <= pe_d_prime_out[i][j];
+        end
+      end
+      if (COLS > 1) begin
+        for(int i = 0; i < ROWS; i = i + 1) begin
+          for(int j = 0; j < COLS-1; j = j + 1) begin
+            a_pipe[i][j] <= pe_a_out[i][j];
+          end
+        end
+      end
     end
-  endgenerate
-  
-  // Connect input 'b' values to the topmost row
-  generate
-    for (col = 0; col < COLS; col = col + 1) begin : connect_b_inputs
-      assign b_wire[0][col] = io_b_in[col];
-    end
-  endgenerate
-  
-  // Note: 'b' values from bottom row are not exposed as outputs
-  // If needed, they can be accessed via b_wire[ROWS][col]
+  end
 
 endmodule
