@@ -7,35 +7,49 @@ module FPmul(
 
   wire  a_sgn = io_a[31];
   wire  b_sgn = io_b[31];
+
   wire [7:0] a_exp = io_a[30:23];
   wire [7:0] b_exp = io_b[30:23];
+
   wire [23:0] a_mnt = {1'h1,io_a[22:0]};
   wire [23:0] b_mnt = {1'h1,io_b[22:0]};
+
   wire  _mntAzero_T_1 = |a_mnt[22:0];
   wire  mntAzero = ~(|a_mnt[22:0]);
   wire  _mntBzero_T_1 = |b_mnt[22:0];
   wire  mntBzero = ~(|b_mnt[22:0]);
+
   wire  expAone = &a_exp;
   wire  expBone = &b_exp;
+
   wire  Azero = ~(|a_exp) & mntAzero;
   wire  Bzero = ~(|b_exp) & mntBzero;
   wire  Inzero = Azero | Bzero;
+
   wire  Ainf = expAone & mntAzero;
   wire  Binf = expBone & mntBzero;
+
   wire  IninfN = Ainf & Binf;
   wire  IninfO = Ainf | Binf;
+
   wire  Anan = expAone & _mntAzero_T_1;
   wire  Bnan = expBone & _mntBzero_T_1;
   wire  Innan = Anan | Bnan;
   wire  flag_nan = Innan | IninfN;
+
   wire [8:0] _oExp1_T = {1'b0,$signed(a_exp)};
   wire [8:0] _oExp1_T_1 = {1'b0,$signed(b_exp)};
+
   wire [8:0] _oExp1_T_4 = $signed(_oExp1_T) + $signed(_oExp1_T_1);
+
   wire [7:0] _oExp1_T_5 = {1'b0,$signed(7'h7f)};
   wire [8:0] _GEN_15 = {{1{_oExp1_T_5[7]}},_oExp1_T_5};
   wire [8:0] oExp1 = $signed(_oExp1_T_4) - $signed(_GEN_15);
   wire  flag_zero1 = $signed(oExp1) < 9'sh0;
+
   wire [47:0] mntmul = a_mnt * b_mnt;
+
+  //normalisation
   wire [1:0] _oExp2_T_1 = {1'b0,$signed(mntmul[47])};
   wire [8:0] _GEN_16 = {{7{_oExp2_T_1[1]}},_oExp2_T_1};
   wire [8:0] oExp2 = $signed(oExp1) + $signed(_GEN_16);

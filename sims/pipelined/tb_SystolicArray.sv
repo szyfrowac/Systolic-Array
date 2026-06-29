@@ -20,6 +20,12 @@ module tb_SystolicArray();
   wire [DATA_WIDTH-1:0] io_a_out [0:ROWS-1];
   wire [DATA_WIDTH-1:0] io_c_out [0:COLS-1];
 
+  // Verification variables
+  reg [DATA_WIDTH-1:0] expected_C [0:1][0:1];
+  integer out_idx [0:1];
+  integer errors = 0;
+  integer total_checked = 0;
+
   // Instantiate the Unit Under Test (UUT)
   SystolicArray #(
     .ROWS(ROWS),
@@ -36,6 +42,16 @@ module tb_SystolicArray();
     .io_a_out(io_a_out),
     .io_c_out(io_c_out)
   );
+
+  // Initialize verification variables
+  initial begin
+    expected_C[0][0] = 32'h41000000;
+    expected_C[0][1] = 32'h41200000;
+    expected_C[1][0] = 32'h40e00000;
+    expected_C[1][1] = 32'h40e00000;
+    out_idx[0] = 0;
+    out_idx[1] = 0;
+  end
 
   // Clock generation
   initial begin
@@ -56,6 +72,7 @@ module tb_SystolicArray();
         io_b_in[i][j] = 0;
       end
     end
+    
     for (int j = 0; j < COLS; j++) begin
       io_d_in[j] = 0;
     end
@@ -67,7 +84,7 @@ module tb_SystolicArray();
     // Load B matrix
     @(posedge clock);
     io_load_b = 1;
-    io_b_in[0][0] = 32'h3F800000; // 1.0 
+    io_b_in[0][0] = 32'h3f800000; // 1.0
     io_b_in[0][1] = 32'h40000000; // 2.0
     io_b_in[1][0] = 32'h40400000; // 3.0
     io_b_in[1][1] = 32'h40800000; // 4.0
@@ -75,71 +92,126 @@ module tb_SystolicArray();
     @(posedge clock);
     io_load_b = 0;
     
-    // -----------------------------------------------------
-    // WAVE SCHEDULE:
-    // With a highly pipelined design, the vertical delay is 
-    // now 6 cycles (5 inside WSPE + 1 inter-PE register).
-    // The horizontal delay is 1 cycle.
-    // 
-    // A_row[r] must be delayed by r * 6 cycles.
-    // D_col[c] must be delayed by c * 1 cycle.
-    // -----------------------------------------------------
+    // Start pushing A and D matrix values
+    // Cycle 0
+    io_a_in[0] = 32'h3f800000; // A[0][0] = 1.0
+    io_a_in[1] = 32'h00000000; // 0.0
+    io_d_in[0] = 32'h40800000; // D[0][0] = 4.0
+    io_d_in[1] = 32'h00000000; // 0.0
+    @(posedge clock);
 
-    // Cycle 0: Start Wave 1 (Row 0)
-    io_a_in[0] = 32'h3F800000; // 1.0 (A00)
-    io_d_in[0] = 32'h40A00000; // 5.0 (D00)
-    
-    // Cycle 1: Start Wave 2 (Row 0), and Wave 1 (Col 1)
+    // Cycle 1
+    io_a_in[0] = 32'h3f800000; // A[1][0] = 1.0
+    io_a_in[1] = 32'h00000000; // 0.0
+    io_d_in[0] = 32'h40400000; // D[1][0] = 3.0
+    io_d_in[1] = 32'h40800000; // D[0][1] = 4.0
     @(posedge clock);
-    io_a_in[0] = 32'h40000000; // 2.0 (A10)
-    io_d_in[0] = 32'h40C00000; // 6.0 (D10)
-    io_d_in[1] = 32'h40E00000; // 7.0 (D01)
-    
-    // Cycle 2: Start Wave 2 (Col 1)
+
+    // Cycle 2
+    io_a_in[0] = 32'h00000000; // 0.0
+    io_a_in[1] = 32'h00000000; // 0.0
+    io_d_in[0] = 32'h00000000; // 0.0
+    io_d_in[1] = 32'h3f800000; // D[1][1] = 1.0
     @(posedge clock);
-    io_a_in[0] = 32'h00000000; 
-    io_d_in[0] = 32'h00000000; 
-    io_d_in[1] = 32'h41000000; // 8.0 (D11)
-    
+
     // Cycle 3
+    io_a_in[0] = 32'h00000000; // 0.0
+    io_a_in[1] = 32'h00000000; // 0.0
+    io_d_in[0] = 32'h00000000; // 0.0
+    io_d_in[1] = 32'h00000000; // 0.0
     @(posedge clock);
-    io_d_in[1] = 32'h00000000;
 
     // Cycle 4
+    io_a_in[0] = 32'h00000000; // 0.0
+    io_a_in[1] = 32'h00000000; // 0.0
+    io_d_in[0] = 32'h00000000; // 0.0
+    io_d_in[1] = 32'h00000000; // 0.0
     @(posedge clock);
+
     // Cycle 5
-    @(posedge clock); 
-
-    // Cycle 6: A01 arrives exactly 6 cycles after A00!
-    @(posedge clock); 
-    io_a_in[1] = 32'h40400000; // 3.0 (A01)
-
-    // Cycle 7: A11 arrives 6 cycles after A10!
+    io_a_in[0] = 32'h00000000; // 0.0
+    io_a_in[1] = 32'h00000000; // 0.0
+    io_d_in[0] = 32'h00000000; // 0.0
+    io_d_in[1] = 32'h00000000; // 0.0
     @(posedge clock);
-    io_a_in[1] = 32'h40800000; // 4.0 (A11)
+
+    // Cycle 6
+    io_a_in[0] = 32'h00000000; // 0.0
+    io_a_in[1] = 32'h00000000; // 0.0
+    io_d_in[0] = 32'h00000000; // 0.0
+    io_d_in[1] = 32'h00000000; // 0.0
+    @(posedge clock);
+
+    // Cycle 7
+    io_a_in[0] = 32'h00000000; // 0.0
+    io_a_in[1] = 32'h00000000; // 0.0
+    io_d_in[0] = 32'h00000000; // 0.0
+    io_d_in[1] = 32'h00000000; // 0.0
+    @(posedge clock);
 
     // Cycle 8
+    io_a_in[0] = 32'h00000000; // 0.0
+    io_a_in[1] = 32'h3f800000; // A[0][1] = 1.0
+    io_d_in[0] = 32'h00000000; // 0.0
+    io_d_in[1] = 32'h00000000; // 0.0
     @(posedge clock);
-    io_a_in[1] = 32'h00000000; 
-    
-    // Wait for pipeline to completely flush results out
-    #300;
+
+    // Cycle 9
+    io_a_in[0] = 32'h00000000; // 0.0
+    io_a_in[1] = 32'h3f800000; // A[1][1] = 1.0
+    io_d_in[0] = 32'h00000000; // 0.0
+    io_d_in[1] = 32'h00000000; // 0.0
+    @(posedge clock);
+
+    // Wait for pipeline to flush out
+    #500;
     
     $display("=================================================");
     $display("Simulation complete.");
+    $display("Expected Outputs:");
+    $display("C[0][0] = 8.0 (32'h41000000)");
+    $display("C[0][1] = 10.0 (32'h41200000)");
+    $display("C[1][0] = 7.0 (32'h40e00000)");
+    $display("C[1][1] = 7.0 (32'h40e00000)");
+    $display("=================================================");
+    
+    // Final PASS/FAIL check
+    if (total_checked == 4 && errors == 0) begin
+      $display("                 TEST PASSED                     ");
+    end else begin
+      $display("                 TEST FAILED                     ");
+      $display(" Errors: %0d", errors);
+      $display(" Outputs Checked: %0d / 4", total_checked);
+    end
     $display("=================================================");
 
     $finish;
   end
 
-  // Monitor
+  // Output Monitor and Checker
   always @(posedge clock) begin
-    if (!reset) begin
+    if (reset == 0) begin
       if (io_c_out[0] != 32'd0 && io_c_out[0] != 32'h80000000) begin
-        $display("[%0t] RESULT: Col 0 Final C Output = %h", $time, io_c_out[0]);
+        $display("[%0t] RESULT STREAMING OUT: Col 0 Final C Output = %h", $time, io_c_out[0]);
+        if (out_idx[0] < 2) begin
+          if (io_c_out[0] !== expected_C[out_idx[0]][0]) begin
+            $display("ERROR: Col 0 output %h does not match expected %h at index %0d", io_c_out[0], expected_C[out_idx[0]][0], out_idx[0]);
+            errors = errors + 1;
+          end
+          out_idx[0] = out_idx[0] + 1;
+          total_checked = total_checked + 1;
+        end
       end
       if (io_c_out[1] != 32'd0 && io_c_out[1] != 32'h80000000) begin
-        $display("[%0t] RESULT: Col 1 Final C Output = %h", $time, io_c_out[1]);
+        $display("[%0t] RESULT STREAMING OUT: Col 1 Final C Output = %h", $time, io_c_out[1]);
+        if (out_idx[1] < 2) begin
+          if (io_c_out[1] !== expected_C[out_idx[1]][1]) begin
+            $display("ERROR: Col 1 output %h does not match expected %h at index %0d", io_c_out[1], expected_C[out_idx[1]][1], out_idx[1]);
+            errors = errors + 1;
+          end
+          out_idx[1] = out_idx[1] + 1;
+          total_checked = total_checked + 1;
+        end
       end
     end
   end

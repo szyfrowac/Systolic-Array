@@ -88,3 +88,7 @@ xsim.dir/tb_snap/xsimSettings.ini
 xsim.dir/work/rounding@unit.sdb
 xsim.dir/work/samesigned@f@paddertop.sdb
 tb_snap.wdb
+tb_snap_non_pipe.wdb
+tb_snap_pipe.wdb
+xsim_909976.backup.jou
+xsim_909976.backup.log
