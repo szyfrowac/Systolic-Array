@@ -5,7 +5,7 @@ This repository contains a complete hardware-software co-design project demonstr
 The core compute hardware is built upon the **Sign-Separated Accumulation (SEA)** scheme, designed to perform resource-efficient floating-point matrix multiplication.
 
 ## Highlights
-- **Hardware**: Fully parameterized 2D Systolic Array written in SystemVerilog. Uses Weight-Stationary Processing Elements (WSPE) that perform IEEE-754 32-bit floating-point Multiply-Accumulate (MAC) operations.
+- **Hardware**: Fully parameterized 2D Systolic Array written in Verilog. Uses Weight-Stationary Processing Elements (WSPE) that perform IEEE-754 32-bit floating-point Multiply-Accumulate (MAC) operations.
 - **Software**: A hybrid Baremetal C inference engine. The ARM Cortex-A9 CPU handles activation functions (ReLU, ArgMax) while streaming Matrix Multiplication (GEMM) layers to the FPGA hardware via AXI DMA.
 - **Results**: Achieved a **1.92x Speedup** over the ARM CPU on a tiny MNIST network (`784 -> 128 -> 10`), and a massive **10x Speedup** on large 1024x1024 matrix operations! The hardware natively classified real MNIST digits with 100% mathematical accuracy compared to the Python baseline model.
 
