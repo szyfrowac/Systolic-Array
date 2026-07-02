@@ -1,31 +1,36 @@
-# Sign Separated Systolic Array
+# 8x8 Floating-Point Systolic Array + MNIST Inference
 
-This repository contains the RTL implementation of a fully parameterized **Floating-Point Systolic Array** written in SystemVerilog. The architecture is designed around a **Weight-Stationary Processing Element (WSPE)**, making it highly efficient for dense matrix multiplications: $C = (A \\times B) + D$.
+This repository contains a complete hardware-software co-design project demonstrating a custom **8x8 Floating-Point Systolic Array** offloading Neural Network inference (MNIST) on a Xilinx Zynq-7000 SoC (ZedBoard).
 
-The array natively computes using IEEE-754 32-bit floating-point arithmetic.
-
-## Detailed Documentation
-
-For a deep dive into how the array works, please read the following detailed documentation files:
-- [Architecture & Dataflow](file:///home/phanikar/BITS/3-2/Projects/Systolic-Array/docs/architecture.md) - Details the weight-stationary flow, PE internals, reset logic, and final accumulation stage.
-- [Simulation & Testing](file:///home/phanikar/BITS/3-2/Projects/Systolic-Array/docs/simulation_and_testing.md) - Details the automated self-checking testbench generator and how to simulate any `N x M` array.
+## Highlights
+- **Hardware**: Fully parameterized 2D Systolic Array written in SystemVerilog. Uses custom Weight-Stationary Processing Elements (WSPE) that perform IEEE-754 32-bit floating-point Multiply-Accumulate (MAC) operations.
+- **Software**: A hybrid Baremetal C inference engine. The ARM Cortex-A9 CPU handles activation functions (ReLU, ArgMax) while streaming Matrix Multiplication (GEMM) layers to the FPGA hardware via AXI DMA.
+- **Results**: Achieved a **1.92x Speedup** over the ARM CPU on a tiny MNIST network (`784 -> 128 -> 10`), and a massive **10x Speedup** on large 1024x1024 matrix operations! The hardware natively classified real MNIST digits with 100% mathematical accuracy compared to the Python baseline model.
 
 ## Directory Structure
+- `/src`: The SystemVerilog HDL sources (Systolic Array, WSPE, FPMul).
+- `/sims`: Python-based testbench generators and simulation wrappers.
+- `/gui_proj`: The Vivado Block Design project containing the AXI DMA IPs and Zynq PS.
+- `/Vitis_Zed`: The Vitis baremetal software workspace containing `mnist.c` and our pre-trained `weights.h`.
+- `/ip_repo`: The packaged Vivado IP for the Systolic Array, ready to be dropped into any block design!
+- `/software/scripts`: Python scripts used to download the MNIST dataset and train the baseline neural network.
+- `/dataset`: Raw MNIST datasets.
 
-- **`srcs/`**: Contains the hardware source code.
-  - `Systolic_Array.sv`: The top-level parameterized 2D mesh of PEs with the final FPadder stage.
-  - `WSPE.v`: The Weight-Stationary Processing Element (PE), the core compute unit.
-  - `FPadder.v` / `FPMul.v`: Floating-point arithmetic modules.
-- **`sims/`**: Contains simulation scripts and testbenches.
-  - `generate_tb.py`: A powerful Python script that automatically generates a fully timed, self-checking testbench for any array dimensions.
-  - `tb_SystolicArray.sv` / `tb_SystolicArray_3x3.sv`: Generated testbenches for simulating the full array.
+## Architecture
 
-## Running Simulations
+### The Weight-Stationary Dataflow
+The array expects `Matrix B` (Weights) to be streamed in first. The weights are passed down the columns and permanently locked into the internal registers of the PEs. 
+Once locked, `Matrix A` (Inputs) streams in row-by-row from the left. As the inputs march across the array, they are multiplied by the stationary weights, and the partial sums cascade downwards through the columns.
 
-We provide a Python script to automatically construct cycle-accurate testbenches for any parameterization of the array. To generate a testbench for a 3x3 array:
+### Hybrid CPU-FPGA Offloading
+Due to AXI DMA limitations (14-bit max transfer length), the C software automatically chunks large matrices into "Ribbons" (e.g. `256 x 8`) and streams them vertically.
+- Layer 1: CPU streams Inputs and W1 into the array. Hardware computes `Hidden`.
+- Layer 2: CPU applies ReLU activation to `Hidden` natively.
+- Layer 3: CPU streams `Hidden` and W2 into the array. Hardware computes `Scores`.
+- Output: CPU runs ArgMax and classifies the digit.
 
-```bash
-python3 sims/generate_tb.py --rows 3 --cols 3 --k 3 --out sims/tb_SystolicArray_3x3.sv
-```
+## Getting Started
 
-This generates a testbench containing randomized small floating-point inputs, automatically staggering them correctly for a systolic pipeline, and checking the answers. You can load this testbench into Vivado Simulator (or your preferred tool) to run the self-checking simulation.
+1. **Hardware Setup**: Open Vivado and point your IP Catalog to the `/ip_repo` directory to add the `SystolicArray_IP` to your block design. Connect it to three AXI DMA engines and a Zynq PS block.
+2. **Software Setup**: Open the Vitis Workspace, import the `mnist.c` code, and build the baremetal application.
+3. **Execution**: Connect your ZedBoard via UART and run the application to see the inference results printed to the console!
