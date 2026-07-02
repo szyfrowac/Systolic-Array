@@ -1,13 +1,13 @@
-# 8x8 Floating-Point Systolic Array + MNIST Inference
+# 8x8 SEA Systolic Array
 
-This repository contains a complete hardware-software co-design project demonstrating a custom **8x8 Floating-Point Systolic Array** offloading Neural Network inference (MNIST) on a Xilinx Zynq-7000 SoC (ZedBoard).
+This repository contains a complete hardware-software co-design project demonstrating a custom **8x8 Floating-Point SEA Systolic Array** on a Xilinx Zynq-7000 SoC (ZedBoard).
 
 The core compute hardware is built upon the **Sign-Separated Accumulation (SEA)** scheme, designed to perform resource-efficient floating-point matrix multiplication.
 
 ## Highlights
 - **Hardware**: Fully parameterized 2D Systolic Array written in Verilog. Uses Weight-Stationary Processing Elements (WSPE) that perform IEEE-754 32-bit floating-point Multiply-Accumulate (MAC) operations.
 - **Software**: A hybrid Baremetal C inference engine. The ARM Cortex-A9 CPU handles activation functions (ReLU, ArgMax) while streaming Matrix Multiplication (GEMM) layers to the FPGA hardware via AXI DMA.
-- **Results**: Achieved a **1.92x Speedup** over the ARM CPU on a tiny MNIST network (`784 -> 128 -> 10`), and a massive **10x Speedup** on large 1024x1024 matrix operations! The hardware natively classified real MNIST digits with 100% mathematical accuracy compared to the Python baseline model.
+- **Results**: Achieved a **1.92x Speedup** over the ARM CPU on a tiny MNIST network (`784 -> 128 -> 10`), and a **10x Speedup** on 1024x1024 matrix operations! The hardware natively classified real MNIST digits with 70% accuracy on 15 training epochs compared to the Python baseline model.
 
 <p float="left">
   <img src="./software/Benchmark_1024x1024.png" width="400" alt="1024x1024 Benchmark Results" />
@@ -26,7 +26,7 @@ The SEA architecture accumulates positive and negative products separately using
 ### Custom Modifications & Enhancements
 While the original SEA architecture was evaluated in simulation on RISC-V Gemmini setups, this project implements a standalone, physical deployment on a Xilinx Zynq FPGA. The following key modifications were introduced to make it synthesizable and performant on physical silicon:
 
-1. **Pipelined Arithmetic Units**: The custom floating-point adders and multipliers inside each Processing Element (PE) were heavily pipelined. This design modification was required to reduce critical path delay, achieve timing closure, and allow the array to run at higher clock frequencies on the Zynq PL fabric.
+1. **Pipelined Arithmetic Units**: The custom floating-point adders and multipliers inside each Processing Element (PE) were heavily pipelined. This design modification was required to reduce critical path delay, achieve timing closure on the Zynq PL fabric.
 2. **AXI-Stream Wrapping**: The 8x8 systolic array has been AXI4-Stream wrapped (`axi_systolic_wrapper.sv`). This packages the array as a standard Vivado IP Core, enabling easy drag-and-drop integration and automated memory streaming via standard AXI DMA controllers.
 
 ---
@@ -49,7 +49,7 @@ While the original SEA architecture was evaluated in simulation on RISC-V Gemmin
 
 ### Weight-Stationary Dataflow
 
-The accelerator employs a **weight-stationary dataflow**, where the elements of **Matrix B (weights)** are streamed into the systolic array first. These weights propagate down their respective columns and are then stored in the local registers of the Processing Elements (PEs), remaining stationary throughout the computation.
+The accelerator employs a **weight-stationary dataflow**, where the elements of **Matrix B (weights)** are streamed into the systolic array first. These weights stored in the local registers of the Processing Elements (PEs), remaining stationary throughout the computation.
 
 Once the weights are loaded:
 
